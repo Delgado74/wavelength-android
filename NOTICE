@@ -1,0 +1,15 @@
+Wavelength Android
+Copyright (c) 2026 Delgado74
+
+This application includes the Wavelength mobile SDK, downloaded at build time
+from the official release:
+
+  https://github.com/lightninglabs/wavelength
+  Release v0.2.0, artifact Wavewalletdk.aar
+
+The Wavelength SDK is distributed under the MIT License by Lightning Labs.
+The SDK binary is not part of this repository and is retrieved by the build
+workflow from GitHub Releases.
+
+This project is not affiliated with or endorsed by Lightning Labs.
+"Wavelength" is used only to describe compatibility with the protocol and SDK.
