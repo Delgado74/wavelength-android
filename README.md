@@ -10,7 +10,10 @@ Wallet Android autocustodiada para [Wavelength](https://github.com/lightninglabs
 - Balance confirmado y pendiente.
 - Recibir por Lightning (factura) y por on-chain (dirección de boarding).
 - Enviar pagos Lightning y on-chain con cotización previa de comisión.
-- Historial de actividad en tiempo real con actualización periódica.
+- Historial de actividad en tiempo real con actualización periódica, origen
+  (Lightning, Ark u on-chain) y confirmaciones de depósitos on-chain.
+- Detalle de cada operación al tocarla: monto, comisión, estado, fase, txid,
+  direcciones, payment hash, preimagen, VTXO y enlace a mempool.
 - Cambio de red: signet, testnet4 y mainnet.
 
 ## Redes

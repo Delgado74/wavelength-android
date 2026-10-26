@@ -1,8 +1,10 @@
 package io.github.delgado74.wavelength.ui
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -77,6 +80,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.delgado74.wavelength.BuildConfig
 import io.github.delgado74.wavelength.Phase
@@ -671,7 +675,7 @@ private fun WalletTab(
             )
         } else {
             state.activity.take(8).forEach { entry ->
-                EntryRow(entry)
+                EntryRow(entry, state.info?.blockHeight ?: 0, state.network)
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -706,7 +710,7 @@ private fun ActivityTab(state: UiState, vm: WalletViewModel, modifier: Modifier 
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(state.activity) { entry ->
-                    EntryRow(entry)
+                    EntryRow(entry, state.info?.blockHeight ?: 0, state.network)
                 }
             }
         }
@@ -1007,14 +1011,33 @@ private fun BalanceCard(
 }
 
 @Composable
-private fun EntryRow(entry: Entry) {
+private fun EntryRow(entry: Entry, blockHeight: Long, network: String) {
+    var showDetail by rememberSaveable(entry.id) { mutableStateOf(false) }
     val incoming = entry.kind == "receive" || entry.kind == "deposit"
     val sign = if (incoming) "+" else "-"
+    val amount = if (entry.amountSat < 0) -entry.amountSat else entry.amountSat
     val amountColor = if (incoming) PositiveGreen else NegativeRed
-    val subtitle = entry.note.ifBlank { entry.counterparty }
-        .ifBlank { entry.progress?.phaseLabel ?: "" }
+    val origin = entryOrigin(entry)
+    val subtitle = buildList {
+        add(originLabel(origin))
+        if (origin == "onchain") {
+            add(confirmationsText(entry, blockHeight))
+        }
+        val detail = entry.note.ifBlank { entry.counterparty }
+        if (detail.isNotBlank() && detail != "boarding") {
+            add(detail)
+        } else {
+            val phase = phaseLabel(entry.progress?.phaseLabel.orEmpty())
+            if (phase.isNotBlank()) add(phase)
+        }
+    }.joinToString(" · ")
 
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { showDetail = true }
+            .padding(vertical = 10.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -1034,7 +1057,7 @@ private fun EntryRow(entry: Entry) {
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    "$sign${formatSats(entry.amountSat)} sats",
+                    "$sign${formatSats(amount)} sats",
                     style = MaterialTheme.typography.titleSmall,
                     color = amountColor,
                 )
@@ -1052,6 +1075,171 @@ private fun EntryRow(entry: Entry) {
         )
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+    if (showDetail) {
+        EntryDetailDialog(
+            entry = entry,
+            blockHeight = blockHeight,
+            network = network,
+            onDismiss = { showDetail = false },
+        )
+    }
+}
+
+@Composable
+private fun EntryDetailDialog(
+    entry: Entry,
+    blockHeight: Long,
+    network: String,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val incoming = entry.kind == "receive" || entry.kind == "deposit"
+    val origin = entryOrigin(entry)
+    val amount = if (entry.amountSat < 0) -entry.amountSat else entry.amountSat
+    val txid = entry.progress?.txid.orEmpty()
+    val confirmations = onchainConfirmations(entry, blockHeight)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 600.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    "Detalle de la operación",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    "${kindLabel(entry.kind)} · ${originLabel(origin)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = BitcoinOrange,
+                )
+                DetailLine(
+                    "Monto",
+                    "${if (incoming) "+" else "-"}${formatSats(amount)} sats",
+                )
+                if (entry.feeSat > 0) {
+                    DetailLine("Comisión", "${formatSats(entry.feeSat)} sats")
+                }
+                DetailLine("Estado", statusLabel(entry.status))
+                val phase = phaseLabel(entry.progress?.phaseLabel.orEmpty())
+                if (phase.isNotBlank()) {
+                    DetailLine("Fase", phase)
+                }
+                if (origin == "onchain") {
+                    DetailLine(
+                        "Confirmaciones",
+                        when {
+                            confirmations == null -> "—"
+                            confirmations <= 0 -> "0 (pendiente)"
+                            confirmations == 1L -> "1"
+                            else -> formatSats(confirmations)
+                        },
+                    )
+                    val height = entry.progress?.confirmationHeight ?: 0
+                    if (height > 0) {
+                        DetailLine("Altura", formatSats(height.toLong()))
+                    }
+                }
+                DetailLine("Fecha", fullDate(entry.createdAt))
+                entry.counterparty.takeIf { it.isNotBlank() }?.let {
+                    DetailLine("Contraparte", it)
+                }
+                entry.note.takeIf { it.isNotBlank() }?.let {
+                    DetailLine("Nota", it)
+                }
+                entry.request?.let { request ->
+                    when (request.type) {
+                        "lightning" -> {
+                            request.lightningInvoice
+                                .takeIf { it.isNotBlank() }
+                                ?.let { DetailLine("Factura Lightning", it, mono = true) }
+                            request.paymentHash
+                                .takeIf {
+                                    it.isNotBlank() &&
+                                        it != entry.progress?.paymentHash
+                                }
+                                ?.let { DetailLine("Payment hash", it, mono = true) }
+                        }
+                        "onchain" -> request.onchainAddress
+                            .takeIf { it.isNotBlank() }
+                            ?.let { DetailLine("Dirección on-chain", it, mono = true) }
+                        "ark" -> request.arkAddress
+                            .takeIf { it.isNotBlank() }
+                            ?.let { DetailLine("Dirección Ark", it, mono = true) }
+                    }
+                }
+                entry.progress?.let { progress ->
+                    progress.txid.takeIf { it.isNotBlank() }?.let {
+                        DetailLine("Txid", it, mono = true)
+                    }
+                    progress.paymentHash.takeIf { it.isNotBlank() }?.let {
+                        DetailLine("Payment hash", it, mono = true)
+                    }
+                    progress.vtxoOutpoint.takeIf { it.isNotBlank() }?.let {
+                        DetailLine("VTXO", it, mono = true)
+                    }
+                    progress.preimage.takeIf { it.isNotBlank() }?.let {
+                        DetailLine("Preimage", it, mono = true)
+                    }
+                }
+                entry.failureCode.takeIf { it.isNotBlank() }?.let {
+                    DetailLine("Código de error", it)
+                }
+                entry.failureReason.takeIf { it.isNotBlank() }?.let {
+                    DetailLine("Error", it)
+                }
+                DetailLine("ID", entry.id, mono = true)
+
+                if (txid.isNotBlank()) {
+                    mempoolTxUrl(network, txid)?.let { url ->
+                        TextButton(onClick = {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(url)),
+                            )
+                        }) {
+                            Text("Ver en mempool")
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cerrar")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailLine(label: String, value: String, mono: Boolean = false) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SelectionContainer {
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = if (mono) FontFamily.Monospace else null,
+            )
+        }
+    }
 }
 
 @Composable
@@ -1395,6 +1583,72 @@ private fun kindLabel(kind: String): String = when (kind) {
     "deposit" -> "Depósito"
     "exit" -> "Salida"
     else -> kind.replaceFirstChar { it.uppercase(Locale.US) }
+}
+
+private fun entryOrigin(entry: Entry): String = when {
+    entry.kind == "deposit" || entry.kind == "exit" -> "onchain"
+    entry.request?.type == "onchain" -> "onchain"
+    entry.request?.type == "lightning" -> "lightning"
+    entry.request?.type == "ark" -> "ark"
+    !entry.progress?.paymentHash.isNullOrBlank() -> "lightning"
+    else -> "unknown"
+}
+
+private fun originLabel(origin: String): String = when (origin) {
+    "lightning" -> "Lightning"
+    "onchain" -> "On-chain"
+    "ark" -> "Ark"
+    else -> "Origen desconocido"
+}
+
+private fun onchainConfirmations(entry: Entry, blockHeight: Long): Long? {
+    if (entryOrigin(entry) != "onchain") return null
+    val height = entry.progress?.confirmationHeight ?: 0
+    if (height <= 0) return 0
+    if (blockHeight <= 0) return null
+    return (blockHeight - height + 1).coerceAtLeast(1)
+}
+
+private fun confirmationsText(entry: Entry, blockHeight: Long): String {
+    val confirmations = onchainConfirmations(entry, blockHeight)
+    return when {
+        confirmations == null -> "confirmación pendiente"
+        confirmations <= 0 -> "0 confirmaciones"
+        confirmations == 1L -> "1 confirmación"
+        else -> "${formatSats(confirmations)} confirmaciones"
+    }
+}
+
+private fun phaseLabel(label: String): String = when (label) {
+    "request_created" -> "Solicitud creada"
+    "waiting_for_payment" -> "Esperando pago"
+    "payment_detected" -> "Pago detectado"
+    "settling" -> "Liquidando"
+    "confirmed" -> "Confirmado"
+    "refunding" -> "Reembolsando"
+    "refunded" -> "Reembolsado"
+    "failed" -> "Fallido"
+    "waiting_for_confirmation" -> "Esperando confirmación"
+    else -> label.replace('_', ' ')
+}
+
+private fun mempoolTxUrl(network: String, txid: String): String? {
+    if (txid.isBlank()) return null
+    val base = when (network) {
+        WalletConfig.MAINNET -> "https://mempool.space"
+        WalletConfig.TESTNET4 -> "https://mempool.space/testnet4"
+        else -> "https://mempool.space/signet"
+    }
+    return "$base/tx/$txid"
+}
+
+private fun fullDate(value: String): String {
+    if (value.isBlank()) return "—"
+    return value
+        .replace('T', ' ')
+        .substringBefore('.')
+        .removeSuffix("Z")
+        .take(19)
 }
 
 private fun statusLabel(status: String): String = when (status) {
