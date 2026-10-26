@@ -49,7 +49,9 @@ Para compilar en un equipo con el SDK descargado:
 ./gradlew :app:assembleDebug
 ```
 
-El AAR no se versiona en el repositorio (ver `.gitignore`).
+El AAR no se versiona en el repositorio (ver `.gitignore`). La clave
+`keystore/debug.keystore` sí se versiona a propósito: solo firma builds de
+depuración y así las actualizaciones se instalan encima sin cambiar de firma.
 
 ## Estructura
 

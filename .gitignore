@@ -9,5 +9,6 @@ captures/
 .cxx/
 *.jks
 *.keystore
+!keystore/debug.keystore
 app/libs/*.aar
 walletkit/libs/*.aar
