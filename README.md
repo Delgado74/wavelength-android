@@ -21,7 +21,18 @@ Wallet Android autocustodiada para [Wavelength](https://github.com/lightninglabs
 | `testnet4` | Pruebas en testnet4. |
 | `mainnet` | Fondos reales. Requiere habilitar `allow_mainnet` en el SDK. |
 
-Los endpoints del operador Ark y del swap server se dejan a los valores por defecto del daemon (Lightning Labs). La wallet de respaldo usa Esplora.
+Los endpoints del operador Ark, del swap server y de Esplora se dejan a los valores por defecto del daemon (Lightning Labs):
+
+| Red | Operador Ark | Swap server |
+| --- | --- | --- |
+| `signet` | `signet.wavelength.lightning.finance:443` | `swap.signet.wavelength.lightning.finance:443` |
+| `testnet4` | `lumosd-testnet4.testnet.lightningcluster.com:443` | `swapd-testnet4.testnet.lightningcluster.com:443` |
+| `mainnet` | `wavelength.lightning.finance:443` | `swap.wavelength.lightning.finance:443` |
+
+> **Mutinynet no está soportado.** El daemon de Wavelength v0.2.0 solo acepta
+> `mainnet`, `testnet`, `testnet4`, `signet`, `regtest` y `simnet`. Mutinynet usa
+> parámetros de cadena propios, por lo que no basta con apuntar el operador de
+> Mutinynet usando `network=signet`.
 
 ## Compilación
 

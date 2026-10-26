@@ -277,8 +277,10 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         pollJob = viewModelScope.launch {
+            delay(4_000)
+            refresh(showBusy = false)
             while (true) {
-                delay(30_000)
+                delay(15_000)
                 refresh(showBusy = false)
             }
         }
@@ -292,8 +294,13 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
             }
             try {
                 val status = client.status()
+                val info = client.getInfo()
                 _state.update {
-                    it.copy(balance = status.balance, pendingCount = status.pendingCount)
+                    it.copy(
+                        info = info,
+                        balance = status.balance,
+                        pendingCount = status.pendingCount,
+                    )
                 }
                 val page = client.listActivity(limit = 50)
                 page.activity?.let { activity ->

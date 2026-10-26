@@ -736,8 +736,9 @@ private fun SettingsTab(state: UiState, vm: WalletViewModel, modifier: Modifier 
                     SettingRow("Altura de bloque", formatSats(info.blockHeight))
                     SettingRow(
                         "Operador Ark",
-                        if (info.serverConnected) "Conectado" else "Sin conexión",
+                        if (info.serverConnected) "Conectado" else "Conectando",
                     )
+                    SettingRow("Endpoint Ark", operatorLabel(state.network))
                     SettingRow("Tipo de wallet", info.walletType)
                     SettingRow("Estado", walletStateLabel(info.walletState))
                 }
@@ -1372,6 +1373,12 @@ private fun networkLabel(network: String): String = when (network) {
     WalletConfig.MAINNET -> "Mainnet"
     WalletConfig.TESTNET4 -> "Testnet4"
     else -> "Signet"
+}
+
+private fun operatorLabel(network: String): String = when (network) {
+    WalletConfig.MAINNET -> "wavelength.lightning.finance:443"
+    WalletConfig.TESTNET4 -> "lumosd-testnet4.testnet.lightningcluster.com:443"
+    else -> "signet.wavelength.lightning.finance:443"
 }
 
 private fun walletStateLabel(state: WalletState): String = when (state) {

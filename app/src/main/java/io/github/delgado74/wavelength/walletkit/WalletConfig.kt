@@ -35,20 +35,17 @@ data class WalletConfig(
             MAINNET -> WalletConfig(
                 dataDir = dataDir,
                 network = MAINNET,
-                walletEsploraUrl = "https://mempool.space/api",
                 allowMainnet = true,
             )
 
             TESTNET4 -> WalletConfig(
                 dataDir = dataDir,
                 network = TESTNET4,
-                walletEsploraUrl = "https://mempool.space/testnet4/api",
             )
 
             else -> WalletConfig(
                 dataDir = dataDir,
                 network = SIGNET,
-                walletEsploraUrl = "https://mempool.space/signet/api",
             )
         }
     }
